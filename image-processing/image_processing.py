@@ -165,11 +165,21 @@ def handler(event, context=None):
             elif fmt == 'webp':
                 contentType = 'image/webp'
                 isLossy = True
+                # Preserve transparency for WebP format
+                if transformedImage.mode in ('RGBA', 'LA') or (transformedImage.mode == 'P' and 'transparency' in transformedImage.info):
+                    # Keep the image in RGBA mode to preserve transparency
+                    if transformedImage.mode != 'RGBA':
+                        transformedImage = transformedImage.convert('RGBA')
             elif fmt == 'png':
                 contentType = 'image/png'
             elif fmt == 'avif':
                 contentType = 'image/avif'
                 isLossy = True
+                # Preserve transparency for AVIF format
+                if transformedImage.mode in ('RGBA', 'LA') or (transformedImage.mode == 'P' and 'transparency' in transformedImage.info):
+                    # Keep the image in RGBA mode to preserve transparency
+                    if transformedImage.mode != 'RGBA':
+                        transformedImage = transformedImage.convert('RGBA')
             else:
                 # Default to JPEG if an unsupported format is specified
                 contentType = 'image/jpeg'
@@ -187,7 +197,18 @@ def handler(event, context=None):
             if contentType:
                 buffer = io.BytesIO()
                 # Use quality setting for all formats
-                transformedImage.save(buffer, format=fmt.upper(), quality=quality)
+                save_kwargs = {'quality': quality}
+                
+                # For WebP, enable transparency support
+                if fmt == 'webp' and transformedImage.mode in ('RGBA', 'LA'):
+                    save_kwargs['lossless'] = False  # Set to True for lossless WebP if needed
+                    save_kwargs['method'] = 6  # Better compression method
+                
+                # For AVIF, enable transparency support
+                if fmt == 'avif' and transformedImage.mode in ('RGBA', 'LA'):
+                    save_kwargs['lossless'] = False  # Set to True for lossless AVIF if needed
+                
+                transformedImage.save(buffer, format=fmt.upper(), **save_kwargs)
                 transformedImageBytes = buffer.getvalue()
                 logger.info(f"Successfully transformed image to format: {fmt}")
         else:
